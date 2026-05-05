@@ -221,10 +221,12 @@ function updateBudget(){
 function priLabel(p){return p===1?'高':p===2?'中':'低';}
 function priClass(p){return p===1?'pb1':p===2?'pb2':'pb3';}
 
-function calcScore(cost,price,pri){
+function calcScore(cost,price,pri,aboveMa){
   var pct=(price-cost)/cost*100,score=0;
   if(pct<-10)score+=30;else if(pct<-5)score+=20;else if(pct<0)score+=10;else if(pct<5)score+=5;
   if(pri===1)score+=30;else if(pri===2)score+=15;
+  // 跌破均線：強制壓低，最高只到「觀望」
+  if(aboveMa===false) score=Math.min(score,14);
   return{score:score,pct:pct};
 }
 function dynamicPri(s, price, q) {
@@ -335,7 +337,8 @@ document.getElementById('calc-btn').addEventListener('click',function(){
     if(!price||isNaN(price)||price<=0)continue;
     var q2=quoteData[stocks[i].code]&&quoteData[stocks[i].code].ok?quoteData[stocks[i].code]:null;
     var effPri2=dynamicPri(stocks[i],price,q2);
-    var sp=calcScore(stocks[i].cost,price,effPri2);
+    var aboveMa2=q2&&q2.ma5?price>=q2.ma5:null;
+    var sp=calcScore(stocks[i].cost,price,effPri2,aboveMa2);
     results.push({i:i,name:stocks[i].name,code:stocks[i].code,price:price,score:sp.score,pct:sp.pct,pri:effPri2});
   }
   if(!results.length){
