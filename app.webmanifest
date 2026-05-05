@@ -1,0 +1,11 @@
+{
+  "name": "加碼評估工具",
+  "short_name": "加碼評估",
+  "description": "台股零股加碼評估與庫存健康檢查",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7f6f2",
+  "theme_color": "#1a1a18",
+  "orientation": "portrait",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
