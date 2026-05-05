@@ -205,24 +205,7 @@ body{font-family:'Noto Sans TC','PingFang TC','Helvetica Neue',sans-serif;color:
 <div class="toast" id="toast"></div>
 
 <script>
-var stocks = [
-  {code:'2330',name:'台積電',cost:1380.31,pri:1},
-  {code:'2454',name:'聯發科',cost:1170.71,pri:1},
-  {code:'0050',name:'台灣50',cost:53.28,pri:2},
-  {code:'00646',name:'S&P500',cost:71.9,pri:2},
-  {code:'00981A',name:'主動統一',cost:24.65,pri:2},
-  {code:'00988A',name:'主動統一全球',cost:15.7,pri:2},
-  {code:'2382',name:'廣達',cost:248.25,pri:2},
-  {code:'2383',name:'台光電',cost:2450,pri:2},
-  {code:'2317',name:'鴻海',cost:133,pri:3},
-  {code:'2324',name:'仁寶',cost:30.6,pri:3},
-  {code:'2449',name:'京元電子',cost:292.63,pri:3},
-  {code:'6117',name:'迎廣',cost:79.8,pri:3},
-  {code:'6127',name:'九豪',cost:48.9,pri:3},
-  {code:'8039',name:'台虹',cost:145.5,pri:3},
-  {code:'0052',name:'富邦科技',cost:46.05,pri:3},
-  {code:'00878',name:'國泰高息',cost:16.15,pri:3},
-];
+var stocks = [];
 
 var quoteData = {};
 
