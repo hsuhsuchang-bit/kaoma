@@ -187,13 +187,7 @@ body{font-family:'Noto Sans TC','PingFang TC','Helvetica Neue',sans-serif;color:
       <div><label>股票代號</label><input id="nc" placeholder="2330" autocomplete="off"></div>
       <div><label>名稱</label><input id="nn" placeholder="台積電" autocomplete="off"></div>
       <div><label>成本價 NT$</label><input type="number" id="nv" placeholder="0" inputmode="decimal"></div>
-      <div><label>優先度</label>
-        <select id="np">
-          <option value="1">高（核心持股）</option>
-          <option value="2" selected>中</option>
-          <option value="3">低</option>
-        </select>
-      </div>
+
     </div>
     <div class="mbtns">
       <button id="modal-cancel">取消</button>
@@ -233,6 +227,20 @@ function calcScore(cost,price,pri){
   if(pri===1)score+=30;else if(pri===2)score+=15;
   return{score:score,pct:pct};
 }
+function dynamicPri(s, price, q) {
+  if (!price) return 2;
+  var pct = (price - s.cost) / s.cost * 100;
+  var aboveMa = q && q.ma5 ? price >= q.ma5 : null;
+  // High priority: below cost AND above MA (dip with recovery signal)
+  if (pct < -5 && aboveMa === true) return 1;
+  if (pct < -3 && aboveMa === true) return 1;
+  // Low priority: well above cost OR below MA with big gain
+  if (pct > 15) return 3;
+  if (pct > 5 && aboveMa === false) return 3;
+  // Default medium
+  return 2;
+}
+
 function badgeHtml(score){
   if(score>=50)return'<span class="badge b-strong">強烈建議加碼</span>';
   if(score>=30)return'<span class="badge b-ok">可考慮加碼</span>';
@@ -286,13 +294,16 @@ function renderEval(){
   if(!stocks.length){el.innerHTML='<div class="empty-state">尚無持股<br>點下方「新增股票」開始</div>';return;}
   var html='';
   for(var i=0;i<stocks.length;i++){
-    var s=stocks[i];var isCore=s.pri===1;
-    var qp = quoteData[s.code] && quoteData[s.code].ok ? quoteData[s.code].price : '';
+    var s=stocks[i];
+    var q=quoteData[s.code]&&quoteData[s.code].ok?quoteData[s.code]:null;
+    var qp = q ? q.price : '';
+    var effPri = qp ? dynamicPri(s, qp, q) : 2;
+    var isCore=effPri===1;
     html+='<div class="stock-card'+(isCore?' core':'')+'">'
       +'<div class="sc-head">'
         +'<div class="sc-info"><div class="code">'+s.code+(isCore?' ★':'')+'</div><div class="name">'+s.name+'</div></div>'
         +'<div style="display:flex;align-items:center;gap:6px">'
-          +'<span class="pri-badge '+priClass(s.pri)+'">'+priLabel(s.pri)+'</span>'
+          +'<span class="pri-badge '+priClass(effPri)+'">'+priLabel(effPri)+(qp?' ↻':'')+'</span>'
           +'<button class="del-btn" data-del="'+i+'">✕</button>'
         +'</div>'
       +'</div>'
@@ -322,8 +333,10 @@ document.getElementById('calc-btn').addEventListener('click',function(){
     var inp=document.querySelector('[data-price="'+i+'"]');
     var price=inp?parseFloat(inp.value):0;
     if(!price||isNaN(price)||price<=0)continue;
-    var sp=calcScore(stocks[i].cost,price,stocks[i].pri);
-    results.push({i:i,name:stocks[i].name,code:stocks[i].code,price:price,score:sp.score,pct:sp.pct,pri:stocks[i].pri});
+    var q2=quoteData[stocks[i].code]&&quoteData[stocks[i].code].ok?quoteData[stocks[i].code]:null;
+    var effPri2=dynamicPri(stocks[i],price,q2);
+    var sp=calcScore(stocks[i].cost,price,effPri2);
+    results.push({i:i,name:stocks[i].name,code:stocks[i].code,price:price,score:sp.score,pct:sp.pct,pri:effPri2});
   }
   if(!results.length){
     document.getElementById('eval-summary').innerHTML='<div class="summary-box"><div style="font-size:13px;color:var(--muted)">請先按「抓取股價」或手動輸入今日價</div></div>';return;
@@ -384,14 +397,49 @@ function healthScore(s, price, q){
   return{score:pts,color:color,label:label};
 }
 
+function holdRecommend(s, price, q, hs) {
+  if (!price) return {label:'--', cls:'', color:'#888780'};
+  var pct = (price - s.cost) / s.cost * 100;
+  var aboveMa = q && q.ma5 ? price >= q.ma5 : null;
+
+  // 止損：健康分低 + 跌破均線 + 虧損超過10%
+  if (hs.score !== null && hs.score < 40 && pct < -10 && aboveMa === false)
+    return {label:'⚠ 考慮止損', cls:'warn', color:'#a32d2d', bg:'#fcebeb'};
+
+  // 止損警示：虧損超過15%
+  if (pct < -15)
+    return {label:'⚠ 考慮止損', cls:'warn', color:'#a32d2d', bg:'#fcebeb'};
+
+  // 觀察：跌破均線但虧損不深
+  if (aboveMa === false && pct < 0)
+    return {label:'👀 觀察', cls:'hold', color:'#854f0b', bg:'#faeeda'};
+
+  // 觀察：健康分偏低
+  if (hs.score !== null && hs.score < 50)
+    return {label:'👀 觀察', cls:'hold', color:'#854f0b', bg:'#faeeda'};
+
+  // 續抱：獲利 + 站上均線
+  if (pct > 0 && aboveMa !== false)
+    return {label:'✓ 續抱', cls:'ok', color:'#3b6d11', bg:'#eaf3de'};
+
+  // 續抱：小虧但站上均線（止穩）
+  if (pct > -5 && aboveMa === true)
+    return {label:'✓ 續抱', cls:'ok', color:'#3b6d11', bg:'#eaf3de'};
+
+  // 預設觀察
+  return {label:'👀 觀察', cls:'hold', color:'#854f0b', bg:'#faeeda'};
+}
+
 function renderHealth(){
   var el=document.getElementById('health-list');
   if(!stocks.length){el.innerHTML='<div class="empty-state">尚無持股</div>';return;}
   var html='';
   for(var i=0;i<stocks.length;i++){
-    var s=stocks[i];var isCore=s.pri===1;
+    var s=stocks[i];
     var q=quoteData[s.code]&&quoteData[s.code].ok?quoteData[s.code]:null;
     var price=q?q.price:0;
+    var effPriH=price?dynamicPri(s,price,q):2;
+    var isCore=effPriH===1;
     var hs=healthScore(s,price,q);
     var pct=price?((price-s.cost)/s.cost*100):null;
     var pctStr=pct!==null?(pct>=0?'+':'')+pct.toFixed(1)+'%':'--';
@@ -415,10 +463,12 @@ function renderHealth(){
           +(price?'<div class="hc-price">現價 NT$'+price+'</div>':'')
         +'</div>'
       +'</div>'
-      +(hs.score!==null?
-        '<div class="score-bar"><div class="score-fill" style="width:'+hs.score+'%;background:'+hs.color+'"></div></div>'
-        +'<div class="score-row"><span class="score-label" style="color:'+hs.color+'">'+hs.label+'</span><span class="score-num">健康 '+hs.score+'/100</span></div>'
-      :'<div style="font-size:12px;color:var(--muted);margin-bottom:10px">請先按「抓取股價」取得資料</div>')
+      +(hs.score!==null?(function(){
+        var rec=holdRecommend(s,price,q,hs);
+        return '<div class="score-bar"><div class="score-fill" style="width:'+hs.score+'%;background:'+hs.color+'"></div></div>'
+          +'<div class="score-row"><span class="score-label" style="color:'+hs.color+'">'+hs.label+'</span><span class="score-num">健康 '+hs.score+'/100</span></div>'
+          +'<div style="margin-bottom:10px"><span style="display:inline-block;font-size:12px;font-weight:600;padding:4px 12px;border-radius:6px;background:'+rec.bg+';color:'+rec.color+'">'+rec.label+'</span></div>';
+      })():'<div style="font-size:12px;color:var(--muted);margin-bottom:10px">請先按「抓取股價」取得資料</div>')
       +'<div class="hc-metrics">'
         +'<div class="hm '+maCls+'"><div class="hml">vs 5日均</div><div class="hmv">'+maV+'</div><div class="hms">'+(q&&q.ma5?'均線 NT$'+q.ma5:'-')+'</div></div>'
         +'<div class="hm"><div class="hml">52週均線</div><div class="hmv">'+volV+'</div><div class="hms">5日均線</div></div>'
@@ -463,9 +513,8 @@ document.getElementById('modal-confirm').addEventListener('click',function(){
   var code=document.getElementById('nc').value.trim().toUpperCase();
   var name=document.getElementById('nn').value.trim();
   var cost=parseFloat(document.getElementById('nv').value);
-  var pri=parseInt(document.getElementById('np').value);
   if(!code||!name||!cost){alert('請填寫完整資料');return;}
-  stocks.push({code:code,name:name,cost:cost,pri:pri});save();renderEval();
+  stocks.push({code:code,name:name,cost:cost,pri:2});save();renderEval();
   document.getElementById('modal-bg').classList.remove('open');
   document.getElementById('nc').value='';document.getElementById('nn').value='';document.getElementById('nv').value='';
   toast('已新增 '+name);
