@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="加碼評估">
+<meta name="theme-color" content="#1a1a18">
+<title>加碼評估工具</title>
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f7f6f2;--surface:#fff;--border:#e4e2da;
+  --text:#1a1a18;--muted:#6b6a65;--hint:#b0aea8;
+  --green-bg:#eaf3de;--green:#3b6d11;
+  --blue-bg:#e6f1fb;--blue:#185fa5;
+  --amber-bg:#faeeda;--amber:#854f0b;
+  --red-bg:#fcebeb;--red:#a32d2d;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;background:var(--bg)}
+body{font-family:'Noto Sans TC','PingFang TC','Helvetica Neue',sans-serif;color:var(--text)}
+
+.topbar{position:sticky;top:0;z-index:100;background:var(--bg);padding:calc(var(--safe-top) + 12px) 16px 10px;border-bottom:0.5px solid var(--border)}
+.topbar-inner{display:flex;justify-content:space-between;align-items:center}
+.topbar h1{font-size:17px;font-weight:600}
+.topbar p{font-size:11px;color:var(--muted);margin-top:1px}
+
+.tabs{display:flex;gap:0;padding:10px 16px 0}
+.tab{flex:1;padding:9px;font-size:13px;font-weight:500;text-align:center;border:none;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:var(--text);border-bottom-color:var(--text)}
+
+.scroll-body{padding:12px 16px calc(var(--safe-bot) + 90px)}
+.section{display:none}.section.active{display:block}
+
+.fetch-bar{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.fetch-bar .fb-info{font-size:12px;color:var(--muted)}
+.fetch-bar .fb-info strong{display:block;font-size:13px;color:var(--text);font-weight:500}
+.fetch-btn{padding:8px 16px;font-size:12px;font-weight:500;border:none;border-radius:8px;background:var(--text);color:#fff;cursor:pointer;white-space:nowrap}
+.fetch-btn:disabled{opacity:.5;cursor:not-allowed}
+.fetch-btn.loading{background:var(--muted)}
+
+.budget-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.bcard{background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:10px 12px}
+.bcard label{font-size:10px;color:var(--muted);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em}
+.bcard input{width:100%;font-size:15px;font-weight:500;border:none;outline:none;background:transparent;color:var(--text)}
+.bcard .val{font-size:15px;font-weight:500;color:var(--text)}
+.bcard .val small{font-size:11px;font-weight:400;color:var(--muted);margin-left:3px}
+
+.sec-label{font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+
+.stock-card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.stock-card.core{border-left:3px solid #378ADD;padding-left:11px}
+.sc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.sc-info .code{font-size:10px;color:var(--muted)}
+.sc-info .name{font-size:14px;font-weight:500}
+.sc-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.ig label{font-size:10px;color:var(--muted);display:block;margin-bottom:3px}
+.ig input{width:100%;padding:7px 9px;font-size:14px;border:0.5px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);outline:none}
+.ig input:focus{border-color:#378ADD}
+.ig input.auto-filled{background:#e6f1fb;border-color:#85b7eb}
+.sc-result{min-height:24px;display:flex;justify-content:space-between;align-items:center}
+
+.badge{display:inline-block;font-size:11px;font-weight:500;padding:3px 9px;border-radius:5px}
+.b-strong{background:var(--green-bg);color:var(--green)}
+.b-ok{background:var(--blue-bg);color:var(--blue)}
+.b-hold{background:var(--amber-bg);color:var(--amber)}
+.b-pass{background:#f1efe8;color:#888780}
+
+.pct{font-size:12px;font-weight:500}
+.pct.up{color:#d85a30}.pct.dn{color:#185fa5}.pct.flat{color:var(--muted)}
+.sc-suggest{font-size:11px;color:var(--muted);text-align:right;margin-top:2px}
+
+.del-btn{font-size:11px;color:var(--hint);background:none;border:none;cursor:pointer;padding:4px}
+.pri-badge{font-size:10px;padding:2px 7px;border-radius:4px}
+.pb1{background:#e6f1fb;color:#185fa5}.pb2{background:#f1efe8;color:#5f5e5a}.pb3{background:#f7f6f2;color:#a8a7a2}
+
+.fab-wrap{position:fixed;bottom:0;left:0;right:0;padding:10px 16px calc(var(--safe-bot) + 10px);background:linear-gradient(transparent,var(--bg) 35%);display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fab{padding:13px;font-size:14px;font-weight:500;border-radius:12px;border:0.5px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;text-align:center}
+.fab.primary{background:var(--text);color:#fff;border-color:var(--text)}
+.fab:active{transform:scale(.97)}
+
+.modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);align-items:flex-end}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;padding:20px 20px calc(var(--safe-bot) + 20px);width:100%}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:14px}
+.mform{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.mform label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px}
+.mform input,.mform select{width:100%;padding:10px 12px;font-size:15px;border:0.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none}
+.mform input:focus,.mform select:focus{border-color:#378ADD}
+.mbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mbtns button{padding:12px;font-size:14px;border-radius:10px;border:0.5px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-weight:500}
+.mbtns button.confirm{background:var(--text);color:#fff;border-color:var(--text)}
+
+.summary-box{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px;margin-top:4px}
+.summary-box h3{font-size:13px;font-weight:500;margin-bottom:10px}
+.srow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px}
+.srow:last-of-type{border-bottom:none}
+.srow .sname{font-weight:500}
+.stotal{display:flex;justify-content:space-between;padding-top:10px;font-size:13px;font-weight:500;border-top:0.5px solid var(--border);margin-top:4px}
+
+/* health */
+.health-card{background:var(--surface);border:0.5px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px}
+.health-card.core{border-left:3px solid #378ADD;padding-left:13px}
+.hc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.hc-info .hcode{font-size:10px;color:var(--muted)}
+.hc-info .hname{font-size:15px;font-weight:600}
+.hc-pnl{font-size:16px;font-weight:600;text-align:right}
+.hc-pnl.profit{color:var(--green)}.hc-pnl.loss{color:var(--red)}.hc-pnl.na{color:var(--muted);font-size:13px}
+.hc-cost{font-size:10px;color:var(--muted);margin-top:1px;text-align:right}
+.hc-price{font-size:11px;color:var(--blue);text-align:right;margin-top:1px}
+
+.score-bar{height:6px;border-radius:3px;background:#f1efe8;overflow:hidden;margin-bottom:5px}
+.score-fill{height:100%;border-radius:3px;transition:width .5s}
+.score-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:10px}
+.score-label{font-weight:500}.score-num{color:var(--muted)}
+
+.hc-metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.hm{background:var(--bg);border-radius:8px;padding:8px 9px}
+.hm .hml{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+.hm .hmv{font-size:13px;font-weight:500;color:var(--text)}
+.hm .hms{font-size:9px;color:var(--muted);margin-top:2px}
+.hm.warn .hmv{color:var(--red)}.hm.ok .hmv{color:var(--green)}.hm.info .hmv{color:var(--blue)}
+
+.ask-btn{width:100%;padding:10px;font-size:12px;font-weight:500;border:0.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);cursor:pointer;text-align:center}
+.ask-btn:active{opacity:.7}
+
+.empty-state{text-align:center;padding:32px 16px;color:var(--muted);font-size:13px;line-height:2}
+
+.toast{position:fixed;top:calc(var(--safe-top) + 60px);left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;padding:8px 18px;border-radius:20px;font-size:12px;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div><h1>加碼評估工具</h1><p>台股零股 · 庫存健康檢查</p></div>
+    <div style="font-size:11px;color:var(--muted);text-align:right" id="last-update">尚未更新</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-eval">加碼評估</button>
+  <button class="tab" id="tab-health">庫存健康</button>
+</div>
+
+<div class="scroll-body">
+
+  <!-- 加碼評估 -->
+  <div class="section active" id="sec-eval">
+    <div style="height:12px"></div>
+    <div class="fetch-bar">
+      <div class="fb-info"><strong>股價資料</strong><span id="fetch-status">點右側按鈕自動更新</span></div>
+      <button class="fetch-btn" id="fetch-btn">抓取股價</button>
+    </div>
+    <div class="budget-row">
+      <div class="bcard"><label>月預算 NT$</label><input id="monthly" type="number" value="15000" inputmode="numeric" oninput="updateBudget()"></div>
+      <div class="bcard"><label>日預算 NT$</label><div class="val" id="daily-val">750 <small>÷20天</small></div></div>
+    </div>
+    <div class="sec-label">持股清單</div>
+    <div id="eval-list"></div>
+    <div id="eval-summary"></div>
+  </div>
+
+  <!-- 庫存健康 -->
+  <div class="section" id="sec-health">
+    <div style="height:12px"></div>
+    <div id="health-list"></div>
+  </div>
+
+</div>
+
+<div class="fab-wrap">
+  <button class="fab" id="add-btn">＋ 新增股票</button>
+  <button class="fab primary" id="calc-btn">計算建議</button>
+</div>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h3>新增持股</h3>
+    <div class="mform">
+      <div><label>股票代號</label><input id="nc" placeholder="2330" autocomplete="off"></div>
+      <div><label>名稱</label><input id="nn" placeholder="台積電" autocomplete="off"></div>
+      <div><label>成本價 NT$</label><input type="number" id="nv" placeholder="0" inputmode="decimal"></div>
+      <div><label>優先度</label>
+        <select id="np">
+          <option value="1">高（核心持股）</option>
+          <option value="2" selected>中</option>
+          <option value="3">低</option>
+        </select>
+      </div>
+    </div>
+    <div class="mbtns">
+      <button id="modal-cancel">取消</button>
+      <button class="confirm" id="modal-confirm">新增</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var stocks = [
+  {code:'2330',name:'台積電',cost:1380.31,pri:1},
+  {code:'2454',name:'聯發科',cost:1170.71,pri:1},
+  {code:'0050',name:'台灣50',cost:53.28,pri:2},
+  {code:'00646',name:'S&P500',cost:71.9,pri:2},
+  {code:'00981A',name:'主動統一',cost:24.65,pri:2},
+  {code:'00988A',name:'主動統一全球',cost:15.7,pri:2},
+  {code:'2382',name:'廣達',cost:248.25,pri:2},
+  {code:'2383',name:'台光電',cost:2450,pri:2},
+  {code:'2317',name:'鴻海',cost:133,pri:3},
+  {code:'2324',name:'仁寶',cost:30.6,pri:3},
+  {code:'2449',name:'京元電子',cost:292.63,pri:3},
+  {code:'6117',name:'迎廣',cost:79.8,pri:3},
+  {code:'6127',name:'九豪',cost:48.9,pri:3},
+  {code:'8039',name:'台虹',cost:145.5,pri:3},
+  {code:'0052',name:'富邦科技',cost:46.05,pri:3},
+  {code:'00878',name:'國泰高息',cost:16.15,pri:3},
+];
+
+var quoteData = {};
+
+function save(){try{localStorage.setItem('kaoma_v3',JSON.stringify(stocks));}catch(e){}}
+function load(){try{var d=localStorage.getItem('kaoma_v3');if(d)stocks=JSON.parse(d);}catch(e){}}
+load();
+
+function toast(msg){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},2200);
+}
+
+function updateBudget(){
+  var m=parseFloat(document.getElementById('monthly').value)||15000;
+  document.getElementById('daily-val').innerHTML=Math.round(m/20).toLocaleString()+' <small>÷20天</small>';
+}
+
+function priLabel(p){return p===1?'高':p===2?'中':'低';}
+function priClass(p){return p===1?'pb1':p===2?'pb2':'pb3';}
+
+function calcScore(cost,price,pri){
+  var pct=(price-cost)/cost*100,score=0;
+  if(pct<-10)score+=30;else if(pct<-5)score+=20;else if(pct<0)score+=10;else if(pct<5)score+=5;
+  if(pri===1)score+=30;else if(pri===2)score+=15;
+  return{score:score,pct:pct};
+}
+function badgeHtml(score){
+  if(score>=50)return'<span class="badge b-strong">強烈建議加碼</span>';
+  if(score>=30)return'<span class="badge b-ok">可考慮加碼</span>';
+  if(score>=15)return'<span class="badge b-hold">觀望</span>';
+  return'<span class="badge b-pass">暫緩</span>';
+}
+
+// ---- fetch quotes ----
+document.getElementById('fetch-btn').addEventListener('click', function() {
+  var btn = this;
+  btn.disabled = true;
+  btn.textContent = '更新中...';
+  btn.classList.add('loading');
+  document.getElementById('fetch-status').textContent = '正在抓取…';
+
+  var codes = stocks.map(function(s){return s.code;}).join(',');
+  fetch('/api/quote?symbols=' + codes)
+    .then(function(r){return r.json();})
+    .then(function(data){
+      quoteData = data;
+      var now = new Date();
+      var timeStr = (now.getMonth()+1)+'/'+(now.getDate())+' '+(now.getHours())+':'+(now.getMinutes()<10?'0':'')+now.getMinutes();
+      document.getElementById('last-update').textContent = '更新 '+timeStr;
+      document.getElementById('fetch-status').textContent = '資料已更新 '+timeStr;
+
+      // fill in price inputs
+      for(var i=0;i<stocks.length;i++){
+        var q = data[stocks[i].code];
+        if(q && q.ok && q.price){
+          var inp = document.querySelector('[data-price="'+i+'"]');
+          if(inp){
+            inp.value = q.price;
+            inp.classList.add('auto-filled');
+          }
+        }
+      }
+      toast('股價更新完成');
+      renderHealth();
+      btn.disabled=false;btn.textContent='重新更新';btn.classList.remove('loading');
+    })
+    .catch(function(){
+      document.getElementById('fetch-status').textContent = '抓取失敗，請重試';
+      toast('抓取失敗，請檢查網路');
+      btn.disabled=false;btn.textContent='抓取股價';btn.classList.remove('loading');
+    });
+});
+
+// ---- eval tab ----
+function renderEval(){
+  var el=document.getElementById('eval-list');
+  if(!stocks.length){el.innerHTML='<div class="empty-state">尚無持股<br>點下方「新增股票」開始</div>';return;}
+  var html='';
+  for(var i=0;i<stocks.length;i++){
+    var s=stocks[i];var isCore=s.pri===1;
+    var qp = quoteData[s.code] && quoteData[s.code].ok ? quoteData[s.code].price : '';
+    html+='<div class="stock-card'+(isCore?' core':'')+'">'
+      +'<div class="sc-head">'
+        +'<div class="sc-info"><div class="code">'+s.code+(isCore?' ★':'')+'</div><div class="name">'+s.name+'</div></div>'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+          +'<span class="pri-badge '+priClass(s.pri)+'">'+priLabel(s.pri)+'</span>'
+          +'<button class="del-btn" data-del="'+i+'">✕</button>'
+        +'</div>'
+      +'</div>'
+      +'<div class="sc-inputs">'
+        +'<div class="ig"><label>成本價</label><input type="number" data-cost="'+i+'" value="'+s.cost+'" inputmode="decimal" step="0.5"></div>'
+        +'<div class="ig"><label>今日價 '+(qp?'<span style="color:#185fa5;font-size:9px">已自動填入</span>':'')+'</label><input type="number" data-price="'+i+'" value="'+qp+'" placeholder="輸入" inputmode="decimal" step="0.5" '+(qp?'class="auto-filled"':'')+'></div>'
+      +'</div>'
+      +'<div class="sc-result" id="r'+i+'"><span style="font-size:12px;color:var(--hint)">'+(qp?'按「計算建議」查看':'輸入今日股價後計算')+'</span></div>'
+    +'</div>';
+  }
+  el.innerHTML=html;
+  el.querySelectorAll('[data-del]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var i=parseInt(this.getAttribute('data-del'));
+      if(confirm('確定刪除「'+stocks[i].name+'」？')){stocks.splice(i,1);save();renderEval();renderHealth();}
+    });
+  });
+  el.querySelectorAll('[data-cost]').forEach(function(inp){
+    inp.addEventListener('change',function(){stocks[parseInt(this.getAttribute('data-cost'))].cost=parseFloat(this.value)||0;save();});
+  });
+}
+
+document.getElementById('calc-btn').addEventListener('click',function(){
+  var budget=parseFloat(document.getElementById('monthly').value)||15000;
+  var results=[];
+  for(var i=0;i<stocks.length;i++){
+    var inp=document.querySelector('[data-price="'+i+'"]');
+    var price=inp?parseFloat(inp.value):0;
+    if(!price||isNaN(price)||price<=0)continue;
+    var sp=calcScore(stocks[i].cost,price,stocks[i].pri);
+    results.push({i:i,name:stocks[i].name,code:stocks[i].code,price:price,score:sp.score,pct:sp.pct,pri:stocks[i].pri});
+  }
+  if(!results.length){
+    document.getElementById('eval-summary').innerHTML='<div class="summary-box"><div style="font-size:13px;color:var(--muted)">請先按「抓取股價」或手動輸入今日價</div></div>';return;
+  }
+  var eligible=results.filter(function(r){return r.score>=30;});
+  var totalScore=eligible.reduce(function(s,r){return s+r.score;},0);
+  for(var j=0;j<results.length;j++){
+    var r=results[j];
+    var el=document.getElementById('r'+r.i);if(!el)continue;
+    var pctStr=(r.pct>=0?'+':'')+r.pct.toFixed(1)+'%';
+    var pctColor=r.pct>0?'#d85a30':r.pct<0?'#185fa5':'#6b6a65';
+    var sAmt=0,sS=0;
+    if(r.score>=30&&totalScore>0){
+      sAmt=Math.round(budget*(r.score/totalScore));sS=Math.floor(sAmt/r.price);
+      if(sS===0)sS=1;var mn=Math.round(sS*r.price);if(sAmt<mn)sAmt=mn;
+    }
+    el.innerHTML=badgeHtml(r.score)+'<div style="text-align:right">'
+      +'<div class="pct" style="color:'+pctColor+'">'+pctStr+'</div>'
+      +(sAmt>0?'<div class="sc-suggest">'+sS+'股 · NT$'+sAmt.toLocaleString()+'</div>':'<div class="sc-suggest">-</div>')
+      +'</div>';
+  }
+  var top=eligible.slice().sort(function(a,b){return b.score-a.score;});
+  var sumEl=document.getElementById('eval-summary');
+  if(!top.length){sumEl.innerHTML='<div class="summary-box"><h3>今日建議</h3><div style="font-size:13px;color:var(--muted);padding:6px 0">今日無明顯加碼機會</div></div>';return;}
+  var total=0,rows='';
+  for(var k=0;k<top.length;k++){
+    var r2=top[k],sA=0,sS2=0;
+    if(totalScore>0){sA=Math.round(budget*(r2.score/totalScore));sS2=Math.floor(sA/r2.price);if(sS2===0)sS2=1;var mn2=Math.round(sS2*r2.price);if(sA<mn2)sA=mn2;}
+    total+=sA;
+    var ps=(r2.pct>=0?'+':'')+r2.pct.toFixed(1)+'%';
+    var pc=r2.pct>0?'#d85a30':r2.pct<0?'#185fa5':'#6b6a65';
+    rows+='<div class="srow"><span class="sname">'+(r2.pri===1?'★ ':'')+r2.name+'</span>'
+      +'<div style="display:flex;gap:7px;align-items:center">'
+        +'<span class="pct" style="margin:0;color:'+pc+'">'+ps+'</span>'
+        +badgeHtml(r2.score).replace('>','> '+sS2+'股 NT$'+sA.toLocaleString()+' ')
+      +'</div></div>';
+  }
+  var daily=Math.round(budget/20);var over=total>daily;
+  sumEl.innerHTML='<div class="summary-box"><h3>今日加碼建議</h3>'+rows
+    +'<div class="stotal" style="color:'+(over?'#a32d2d':'var(--text)')+'"><span>今日建議總計</span>'
+    +'<span>NT$'+total.toLocaleString()+(over?' ⚠ 超出日預算':'')+'</span></div></div>';
+});
+
+// ---- health tab ----
+function healthScore(s, price, q){
+  if(!price) return {score:null,color:'#888780',label:'尚未取得股價'};
+  var pts=100;
+  var pct=(price-s.cost)/s.cost*100;
+  if(pct<-20)pts-=40;else if(pct<-10)pts-=25;else if(pct<-5)pts-=15;else if(pct>0)pts+=5;
+  if(q && q.ma5 && price<q.ma5) pts-=15;
+  if(q && q.hi52 && q.lo52){
+    var range=q.hi52-q.lo52;
+    if(range>0){var pos=(price-q.lo52)/range;if(pos>0.85)pts-=10;if(pos<0.15)pts+=8;}
+  }
+  pts=Math.max(0,Math.min(100,Math.round(pts)));
+  var color=pts>=70?'#3b6d11':pts>=45?'#854f0b':'#a32d2d';
+  var label=pts>=70?'健康':pts>=45?'需關注':'警示';
+  return{score:pts,color:color,label:label};
+}
+
+function renderHealth(){
+  var el=document.getElementById('health-list');
+  if(!stocks.length){el.innerHTML='<div class="empty-state">尚無持股</div>';return;}
+  var html='';
+  for(var i=0;i<stocks.length;i++){
+    var s=stocks[i];var isCore=s.pri===1;
+    var q=quoteData[s.code]&&quoteData[s.code].ok?quoteData[s.code]:null;
+    var price=q?q.price:0;
+    var hs=healthScore(s,price,q);
+    var pct=price?((price-s.cost)/s.cost*100):null;
+    var pctStr=pct!==null?(pct>=0?'+':'')+pct.toFixed(1)+'%':'--';
+    var pctClass=pct===null?'na':pct>0?'profit':'loss';
+
+    var maV='--',maCls='';
+    if(q&&q.ma5&&price){var md=((price-q.ma5)/q.ma5*100);maV=(md>=0?'+':'')+md.toFixed(1)+'%';maCls=md>=0?'ok':'warn';}
+
+    var posV='--',posCls='';
+    if(q&&q.hi52&&q.lo52&&price){var range=q.hi52-q.lo52;if(range>0){var pos=Math.round((price-q.lo52)/range*100);posV=pos+'%';posCls=pos>80?'warn':pos<20?'info':'';}}
+
+    var volV='--';
+    if(q&&q.ma5){volV='NT$'+q.ma5.toLocaleString();}
+
+    html+='<div class="health-card'+(isCore?' core':'')+'">'
+      +'<div class="hc-top">'
+        +'<div class="hc-info"><div class="hcode">'+s.code+(isCore?' ★':'')+'</div><div class="hname">'+s.name+'</div></div>'
+        +'<div>'
+          +'<div class="hc-pnl '+pctClass+'">'+pctStr+'</div>'
+          +'<div class="hc-cost">成本 NT$'+s.cost+'</div>'
+          +(price?'<div class="hc-price">現價 NT$'+price+'</div>':'')
+        +'</div>'
+      +'</div>'
+      +(hs.score!==null?
+        '<div class="score-bar"><div class="score-fill" style="width:'+hs.score+'%;background:'+hs.color+'"></div></div>'
+        +'<div class="score-row"><span class="score-label" style="color:'+hs.color+'">'+hs.label+'</span><span class="score-num">健康 '+hs.score+'/100</span></div>'
+      :'<div style="font-size:12px;color:var(--muted);margin-bottom:10px">請先按「抓取股價」取得資料</div>')
+      +'<div class="hc-metrics">'
+        +'<div class="hm '+maCls+'"><div class="hml">vs 5日均</div><div class="hmv">'+maV+'</div><div class="hms">'+(q&&q.ma5?'均線 NT$'+q.ma5:'-')+'</div></div>'
+        +'<div class="hm"><div class="hml">52週均線</div><div class="hmv">'+volV+'</div><div class="hms">5日均線</div></div>'
+        +'<div class="hm '+posCls+'"><div class="hml">52週位置</div><div class="hmv">'+posV+'</div><div class="hms">'+(q&&q.hi52?'高'+q.hi52+'/低'+q.lo52:'-')+'</div></div>'
+      +'</div>'
+      +'<button class="ask-btn" data-ask="'+i+'">詢問 Claude：'+s.name+' 近期基本面分析 ↗</button>'
+    +'</div>';
+  }
+  el.innerHTML=html;
+  el.querySelectorAll('[data-ask]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var i=parseInt(this.getAttribute('data-ask'));
+      var s=stocks[i];var q=quoteData[s.code]&&quoteData[s.code].ok?quoteData[s.code]:null;
+      var price=q?q.price:0;
+      var pct=price?((price-s.cost)/s.cost*100).toFixed(1):null;
+      var msg=s.name+'（'+s.code+'）庫存健康分析'
+        +(price?'：現價 NT$'+price+'，成本 NT$'+s.cost+'，損益 '+(pct>0?'+':'')+pct+'%':'')
+        +'。請搜尋近期營收趨勢、法人買賣動向、產業消息，評估是否適合續抱或止損，給出具體建議。';
+      sendPrompt(msg);
+    });
+  });
+}
+
+// ---- tabs ----
+document.getElementById('tab-eval').addEventListener('click',function(){
+  this.classList.add('active');document.getElementById('tab-health').classList.remove('active');
+  document.getElementById('sec-eval').classList.add('active');document.getElementById('sec-health').classList.remove('active');
+  document.getElementById('calc-btn').style.display='';document.getElementById('add-btn').style.display='';
+});
+document.getElementById('tab-health').addEventListener('click',function(){
+  this.classList.add('active');document.getElementById('tab-eval').classList.remove('active');
+  document.getElementById('sec-health').classList.add('active');document.getElementById('sec-eval').classList.remove('active');
+  document.getElementById('calc-btn').style.display='none';document.getElementById('add-btn').style.display='none';
+  renderHealth();
+});
+
+// ---- modal ----
+document.getElementById('add-btn').addEventListener('click',function(){document.getElementById('modal-bg').classList.add('open');setTimeout(function(){document.getElementById('nc').focus();},100);});
+document.getElementById('modal-cancel').addEventListener('click',function(){document.getElementById('modal-bg').classList.remove('open');});
+document.getElementById('modal-bg').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+document.getElementById('modal-confirm').addEventListener('click',function(){
+  var code=document.getElementById('nc').value.trim().toUpperCase();
+  var name=document.getElementById('nn').value.trim();
+  var cost=parseFloat(document.getElementById('nv').value);
+  var pri=parseInt(document.getElementById('np').value);
+  if(!code||!name||!cost){alert('請填寫完整資料');return;}
+  stocks.push({code:code,name:name,cost:cost,pri:pri});save();renderEval();
+  document.getElementById('modal-bg').classList.remove('open');
+  document.getElementById('nc').value='';document.getElementById('nn').value='';document.getElementById('nv').value='';
+  toast('已新增 '+name);
+});
+
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(function(){});}
+renderEval();updateBudget();
+</script>
+</body>
+</html>
